@@ -159,25 +159,25 @@ await main(files)
     }
   }
 
-  async function get_files(FS, dir, tree_info) {
+  async function get_files(dir, tree_info) {
     let path = `${dir}/${tree_info.path}`
     const details = await get_json(tree_info.url)
     if (tree_info.type === 'tree') {
-      const files = await Promise.all(details.tree.map(t => get_files(FS, path, t)))
+      const files = await Promise.all(details.tree.map(t => get_files(path, t)))
       return files.flat()
     } else {
       return [{path, content: atob(details.content)}]
     }
   }
 
-  async function download_test_files(FS) {
+  async function download_test_files() {
     // const commits = await get_json('https://api.github.com/repos/samuelcolvin/pydantic-core/commits')
     // const commit = await get_json(commits[0].commit.url)
     // this commit matches the version of pydantic-core compiled below
     const commit = await get_json('https://api.github.com/repos/samuelcolvin/pydantic-core/git/commits/515ff1004c866b23dbbd05e543c4a936ed2fdb09')
     const tree = await get_json(commit.tree.url)
     const tests_tree = tree.tree.find(x => x.path === 'tests')
-    return await get_files(FS, '/test_dir', tests_tree)
+    return await get_files('/test_dir', tests_tree)
   }
 
   const output_el = document.getElementById('output')
@@ -186,9 +186,9 @@ await main(files)
   const ansi_converter = new Convert()
   let terminal_output = ''
 
-  output_el.innerText = 'download test files...'
+  output_el.innerText = 'Fetching test files from GitHub...'
   download_test_files().then(files => {
-    output_el.innerText = `download ${files.length} files, starting python...`
+    output_el.innerText = `Fetched ${files.length} test files, starting python...`
     const blob = new Blob([document.getElementById('worker').textContent], {type: 'application/javascript'})
     const worker = new Worker(window.URL.createObjectURL(blob))
     worker.onmessage = ({data}) => {
