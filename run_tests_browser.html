@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<title>pydantic-core unit tests</title>
+<style>
+  html, body {
+    height: 100%;
+    background: rgb(30, 31, 46);
+    color: white;
+  }
+  main {
+    max-width: 800px;
+    height: calc(100% - 80px);
+    overflow-y: scroll;
+    overflow-x: hidden;
+    margin: 20px auto;
+    padding: 10px 15px;
+    border: 1px solid #aaa;
+    border-radius: 5px;
+  }
+  pre {
+    margin: 0;
+    padding: 0;
+    white-space: pre-wrap;
+  }
+</style>
+<main>
+<pre id="output">loading...</pre>
+</main>
+<!-- this code is used by the worker to prepare and run tests -->
+<!-- language=python -->
+<script id="python_code" type="python">
+import sys
+import micropip
+import importlib
+from pathlib import Path
+
+import pytest
+
+# this seems to be required for me on M1 Mac
+sys.setrecursionlimit(150)
+
+async def main(files):
+    for file in files:
+        path = Path('.') / file['path']
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(file['content'])
+    print(f'Mounted {len(files)} test files, installing dependencies...')
+
+    await micropip.install([
+        'dirty-equals',
+        'hypothesis',
+        'pytest-speed',
+        'https://smokeshow.helpmanual.io/652r5l73373s1t265o0i/pydantic_core-0.0.1-cp310-cp310-emscripten_3_1_14_wasm32.whl'
+    ])
+    importlib.invalidate_caches()
+
+    # print('installed packages:')
+    # print(micropip.list())
+    print('Running tests...')
+    pytest.main()
+
+await main(files)
+</script>
+<script id="worker">
+  let chunks = []
+  let last_post = 0
+
+  function print(tty) {
+    if (tty.output && tty.output.length > 0) {
+      chunks.push(tty.output)
+      tty.output = []
+      const now = performance.now()
+      if (now - last_post > 100) {
+        post()
+        last_post = now
+      }
+    }
+  }
+
+  function post() {
+    self.postMessage(chunks)
+    chunks = []
+  }
+
+  function make_tty_ops() {
+    return {
+      put_char(tty, val) {
+        if (val !== null) {
+          tty.output.push(val)
+        }
+        if (val === null || val === 10) {
+          print(tty)
+        }
+      },
+      flush(tty) {
+        print(tty)
+      },
+    }
+  }
+
+  function setupStreams(FS, TTY) {
+    let mytty = FS.makedev(FS.createDevice.major++, 0)
+    let myttyerr = FS.makedev(FS.createDevice.major++, 0)
+    TTY.register(mytty, make_tty_ops())
+    TTY.register(myttyerr, make_tty_ops())
+    FS.mkdev('/dev/mytty', mytty)
+    FS.mkdev('/dev/myttyerr', myttyerr)
+    FS.unlink('/dev/stdin')
+    FS.unlink('/dev/stdout')
+    FS.unlink('/dev/stderr')
+    FS.symlink('/dev/mytty', '/dev/stdin')
+    FS.symlink('/dev/mytty', '/dev/stdout')
+    FS.symlink('/dev/myttyerr', '/dev/stderr')
+    FS.closeStream(0)
+    FS.closeStream(1)
+    FS.closeStream(2)
+    FS.open('/dev/stdin', 0)
+    FS.open('/dev/stdout', 1)
+    FS.open('/dev/stderr', 1)
+  }
+
+  self.onmessage = async ({data}) => {
+    const {files, python_code} = data
+    await importScripts('https://cdn.jsdelivr.net/pyodide/v0.21.0a3/full/pyodide.js')
+    const pyodide = await loadPyodide()
+    const {FS} = pyodide
+    setupStreams(FS, pyodide._module.TTY)
+    FS.mkdir('/test_dir')
+    FS.chdir('/test_dir')
+    await pyodide.loadPackage(['micropip', 'pytest', 'pytz'])
+    try {
+      await pyodide.runPythonAsync(python_code, {globals: pyodide.toPy({files})})
+    } catch (err) {
+      console.error(err)
+      const raw_error = Array.from(new TextEncoder().encode(err.toString()))
+      self.postMessage(raw_error)
+    }
+    post()
+  }
+</script>
+
+<script src="https://smokeshow.helpmanual.io/2d1p666q3x5f0j26223o/ansi-to-html.browser.js"></script>
+<script>
+  async function get_json(url) {
+    const cache_key = `file-cache:${url}`
+    const cache_value = localStorage.getItem(cache_key)
+    if (cache_value) {
+      return JSON.parse(cache_value)
+    }
+    const r = await fetch(url)
+    if (r.ok) {
+      let obj = await r.json()
+      localStorage.setItem(cache_key, JSON.stringify(obj))
+      return obj
+    } else {
+      const text = await r.text()
+      console.error('unexpected response', r, text)
+      throw new Error(`${r.status} ${r.statusText}`)
+    }
+  }
+
+  async function get_files(FS, dir, tree_info) {
+    let path = `${dir}/${tree_info.path}`
+    const details = await get_json(tree_info.url)
+    if (tree_info.type === 'tree') {
+      const files = await Promise.all(details.tree.map(t => get_files(FS, path, t)))
+      return files.flat()
+    } else {
+      return [{path, content: atob(details.content)}]
+    }
+  }
+
+  async function download_test_files(FS) {
+    // const commits = await get_json('https://api.github.com/repos/samuelcolvin/pydantic-core/commits')
+    // const commit = await get_json(commits[0].commit.url)
+    // this commit matches the version of pydantic-core compiled below
+    const commit = await get_json('https://api.github.com/repos/samuelcolvin/pydantic-core/git/commits/515ff1004c866b23dbbd05e543c4a936ed2fdb09')
+    const tree = await get_json(commit.tree.url)
+    const tests_tree = tree.tree.find(x => x.path === 'tests')
+    return await get_files(FS, '/test_dir', tests_tree)
+  }
+
+  const output_el = document.getElementById('output')
+  const decoder = new TextDecoder()
+  const Convert = require('ansi-to-html')
+  const ansi_converter = new Convert()
+  let terminal_output = ''
+
+  output_el.innerText = 'download test files...'
+  download_test_files().then(files => {
+    output_el.innerText = `download ${files.length} files, starting python...`
+    const blob = new Blob([document.getElementById('worker').textContent], {type: 'application/javascript'})
+    const worker = new Worker(window.URL.createObjectURL(blob))
+    worker.onmessage = ({data}) => {
+      for (let chunk of data) {
+        let arr = new Uint8Array(chunk)
+        let extra = decoder.decode(arr)
+        terminal_output += extra
+      }
+      output_el.innerHTML = ansi_converter.toHtml(terminal_output)
+      // scrolls to the bottom of the div
+      output_el.scrollIntoView(false)
+    }
+    const python_code = document.getElementById('python_code').textContent
+    worker.postMessage({files, python_code})
+  })
+</script>
