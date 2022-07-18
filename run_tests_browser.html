@@ -148,14 +148,13 @@ await main(files)
       return JSON.parse(cache_value)
     }
     const r = await fetch(url)
+    let obj = await r.json()
     if (r.ok) {
-      let obj = await r.json()
       localStorage.setItem(cache_key, JSON.stringify(obj))
       return obj
     } else {
-      const text = await r.text()
-      console.error('unexpected response', r, text)
-      throw new Error(`${r.status} ${r.statusText}`)
+      console.error('unexpected response', r, obj)
+      throw new Error(`${r.status}: ${obj.message}`)
     }
   }
 
@@ -203,5 +202,7 @@ await main(files)
     }
     const python_code = document.getElementById('python_code').textContent
     worker.postMessage({files, python_code})
+  }).catch(err => {
+    output_el.innerText = `Error fetching test files: ${err}`
   })
 </script>
