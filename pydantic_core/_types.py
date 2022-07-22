@@ -278,10 +278,8 @@ class CallableSchema(TypedDict):
 
 class ArgumentsSchema(TypedDict, total=False):
     type: Required[Literal['arguments']]
-    positional_only_args: TuplePositionalSchema
-    var_args: TupleVariableSchema
+    positional_args: TuplePositionalSchema
     keyword_args: TypedDictSchema
-    function: Callable[..., Any]
     ref: str
 
 

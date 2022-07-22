@@ -308,8 +308,10 @@ pub enum ErrorKind {
     UnexpectedKeywordArguments,
     #[strum(message = "Missing key word arguments")]
     MissingKeywordArguments,
-    #[strum(message = "Missing Arguments")]
-    MissingArguments,
+    #[strum(message = "Unexpected positional arguments")]
+    UnexpectedPositionalArguments,
+    #[strum(message = "Missing positional arguments")]
+    MissingPositionalArguments,
     #[strum(message = "Two elements (args, kwargs) required to call a function")]
     TwoArgumentsRequired,
 }
