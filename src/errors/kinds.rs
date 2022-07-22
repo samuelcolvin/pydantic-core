@@ -302,6 +302,16 @@ pub enum ErrorKind {
     UnionTagNotFound {
         discriminator: String,
     },
+    // ---------------------
+    // argument errors
+    #[strum(message = "Unexpected key word arguments")]
+    UnexpectedKeywordArguments,
+    #[strum(message = "Missing key word arguments")]
+    MissingKeywordArguments,
+    #[strum(message = "Missing Arguments")]
+    MissingArguments,
+    #[strum(message = "Two elements (args, kwargs) required to call a function")]
+    TwoArgumentsRequired,
 }
 
 macro_rules! render {

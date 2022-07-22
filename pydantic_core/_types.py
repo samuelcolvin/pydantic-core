@@ -276,6 +276,15 @@ class CallableSchema(TypedDict):
     type: Literal['callable']
 
 
+class ArgumentsSchema(TypedDict, total=False):
+    type: Required[Literal['arguments']]
+    positional_only_args: TuplePositionalSchema
+    var_args: TupleVariableSchema
+    keyword_args: TypedDictSchema
+    function: Callable[..., Any]
+    ref: str
+
+
 # pydantic allows types to be defined via a simple string instead of dict with just `type`, e.g.
 # 'int' is equivalent to {'type': 'int'}, this only applies to schema types which do not have other required fields
 BareType = Literal[
@@ -331,4 +340,5 @@ Schema = Union[
     TimedeltaSchema,
     IsInstanceSchema,
     CallableSchema,
+    ArgumentsSchema,
 ]
