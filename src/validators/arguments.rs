@@ -15,7 +15,7 @@ use super::{build_validator, BuildContext, BuildValidator, CombinedValidator, Ex
 #[derive(Debug, Clone)]
 pub struct ArgumentsValidator {
     // TODO use nohash-hasher
-    argument_mapping: Option<HashMap<usize, String>>,
+    argument_mapping: Option<Vec<(usize, String)>>,
     positional_args: Option<TuplePositionalValidator>,
     keyword_args: Option<TypedDictValidator>,
     name: String,
@@ -112,6 +112,18 @@ impl ArgumentsValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
+        match (args, &self.argument_mapping) {
+            (Some(args), Some(argument_mapping)) => {
+                let kwargs = match kwargs {
+                    Some(kwargs) => todo!(),
+                    None => PyDict::new(py),
+                };
+                for (index, name) in argument_mapping {
+
+                }
+            }
+        }
+
         let arg_result = match (args, &self.positional_args) {
             (Some(args), Some(args_validator)) => {
                 Some(args_validator.validate_list_like(py, args, input, extra, slots, recursion_guard))

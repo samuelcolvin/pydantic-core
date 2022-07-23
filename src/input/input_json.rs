@@ -1,4 +1,5 @@
 use crate::errors::{ErrorKind, InputValue, LocItem, ValError, ValResult};
+use crate::input::GenericArguments;
 
 use super::datetime::{
     bytes_as_date, bytes_as_datetime, bytes_as_time, bytes_as_timedelta, float_as_datetime, float_as_duration,
@@ -24,6 +25,28 @@ impl<'a> Input<'a> for JsonInput {
 
     fn is_none(&self) -> bool {
         matches!(self, JsonInput::Null)
+    }
+
+    fn validate_args_pair(&'a self) -> ValResult<'a, GenericArguments<'a>> {
+        match self {
+            JsonInput::Object(kwargs) => Ok(GenericArguments::Json((None, Some(kwargs)))),
+            JsonInput::Array(array) => {
+                if array.len() != 2 {
+                    Err(ValError::new(ErrorKind::ArgumentsType, self))
+                } else {
+                    let args = match unsafe { array.get_unchecked(0) } {
+                        JsonInput::Array(args) => args,
+                        _ => Err(ValError::new(ErrorKind::ArgumentsType, self)),
+                    };
+                    let kwargs= match unsafe { array.get_unchecked(1) } {
+                        JsonInput::Object(kwargs) => kwargs,
+                        _ => Err(ValError::new(ErrorKind::ArgumentsType, self)),
+                    };
+                    Ok(GenericArguments::Json((Some(args), Some(kwargs))))
+                }
+            },
+            _ => Err(ValError::new(ErrorKind::ArgumentsType, self)),
+        }
     }
 
     fn strict_str(&'a self) -> ValResult<EitherString<'a>> {

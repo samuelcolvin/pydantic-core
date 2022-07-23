@@ -164,6 +164,12 @@ derive_from!(GenericMapping, PyGetAttr, PyAny);
 derive_from!(GenericMapping, JsonObject, JsonObject);
 
 #[derive(Debug)]
+pub enum GenericArguments<'a> {
+    Py((Option<&'a PyList>, Option<&'a PyDict>)),
+    Json((Option<&'a JsonArray>, Option<&'a JsonObject>)),
+}
+
+#[derive(Debug)]
 pub enum EitherString<'a> {
     Cow(Cow<'a, str>),
     Py(&'a PyString),

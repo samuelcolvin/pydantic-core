@@ -9,6 +9,7 @@ use pyo3::types::{
 use pyo3::{intern, AsPyPointer};
 
 use crate::errors::{py_err_string, ErrorKind, InputValue, LocItem, ValError, ValResult};
+use crate::input::GenericArguments;
 
 use super::datetime::{
     bytes_as_date, bytes_as_datetime, bytes_as_time, bytes_as_timedelta, date_as_datetime, float_as_datetime,
@@ -58,6 +59,34 @@ impl<'a> Input<'a> for PyAny {
 
     fn callable(&self) -> bool {
         self.is_callable()
+    }
+
+    fn validate_args_pair(&'a self) -> ValResult<'a, GenericArguments<'a>> {
+        if let Ok(kwargs) = self.cast_as::<PyDict>() {
+            Ok(GenericArguments::Py((None, Some(kwargs))))
+        } else if let Ok((args, kwargs)) = self.extract::<(&PyAny, &PyAny)>() {
+            let args = if let Ok(list) = args.cast_as::<PyList>() {
+                Some(list)
+            } else if args.is_none() {
+                None
+            } else if let Ok(tuple) = args.cast_as::<PyTuple>() {
+                Some(PyList::new(py, tuple.iter().collect::<Vec<_>>()))
+            } else {
+                // TODO, better error?
+                return Err(ValError::new(ErrorKind::ArgumentsType, self));
+            };
+            let kwargs = if let Ok(dict) = kwargs.cast_as::<PyDict>() {
+                Some(dict)
+            } else if kwargs.is_none() {
+                None
+            } else {
+                // TODO, better error?
+                return Err(ValError::new(ErrorKind::ArgumentsType, self));
+            };
+            Ok(GenericArguments::Py((args, kwargs)))
+        } else {
+            Err(ValError::new(ErrorKind::ArgumentsType, self))
+        }
     }
 
     fn strict_str(&'a self) -> ValResult<EitherString<'a>> {
