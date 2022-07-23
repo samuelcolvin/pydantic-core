@@ -297,6 +297,18 @@ pub enum ErrorKind {
     UnionTagNotFound {
         discriminator: String,
     },
+    // ---------------------
+    // argument errors
+    #[strum(message = "Value must be a pair of values consisting of (args, kwargs), or a plain dict to call a function")]
+    ArgumentsType,
+    #[strum(message = "Unexpected key word arguments")]
+    UnexpectedKeywordArguments,
+    #[strum(message = "Missing key word arguments")]
+    MissingKeywordArguments,
+    #[strum(message = "Unexpected positional arguments")]
+    UnexpectedPositionalArguments,
+    #[strum(message = "Missing positional arguments")]
+    MissingPositionalArguments,
 }
 
 macro_rules! render {

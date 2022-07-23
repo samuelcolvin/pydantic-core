@@ -164,11 +164,35 @@ impl Validator for TypedDictValidator {
     ) -> ValResult<'data, PyObject> {
         if let Some(field) = extra.field {
             // we're validating assignment, completely different logic
-            return self.validate_assignment(py, field, input, extra, slots, recursion_guard);
+            self.validate_assignment(py, field, input, extra, slots, recursion_guard)
+        } else {
+            let strict = extra.strict.unwrap_or(self.strict);
+            let dict = input.validate_typed_dict(strict, self.from_attributes)?;
+            self.validate_generic_mapping(py, dict, input, extra, slots, recursion_guard)
         }
-        let strict = extra.strict.unwrap_or(self.strict);
-        let dict = input.validate_typed_dict(strict, self.from_attributes)?;
+    }
 
+    fn get_name(&self) -> &str {
+        Self::EXPECTED_TYPE
+    }
+
+    fn complete(&mut self, build_context: &BuildContext) -> PyResult<()> {
+        self.fields
+            .iter_mut()
+            .try_for_each(|f| f.validator.complete(build_context))
+    }
+}
+
+impl TypedDictValidator {
+    pub fn validate_generic_mapping<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        dict: GenericMapping,
+        input: &'data impl Input<'data>,
+        extra: &Extra,
+        slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
+    ) -> ValResult<'data, PyObject> {
         let output_dict = PyDict::new(py);
         let mut errors: Vec<ValLineError> = Vec::with_capacity(self.fields.len());
         let mut fields_set_vec: Option<Vec<Py<PyString>>> = match self.return_fields_set {
@@ -322,18 +346,6 @@ impl Validator for TypedDictValidator {
         }
     }
 
-    fn get_name(&self) -> &str {
-        Self::EXPECTED_TYPE
-    }
-
-    fn complete(&mut self, build_context: &BuildContext) -> PyResult<()> {
-        self.fields
-            .iter_mut()
-            .try_for_each(|f| f.validator.complete(build_context))
-    }
-}
-
-impl TypedDictValidator {
     fn validate_assignment<'s, 'data>(
         &'s self,
         py: Python<'data>,

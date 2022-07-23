@@ -122,7 +122,31 @@ impl Validator for TuplePositionalValidator {
         slots: &'data [CombinedValidator],
         recursion_guard: &'s mut RecursionGuard,
     ) -> ValResult<'data, PyObject> {
-        let seq = input.validate_tuple(extra.strict.unwrap_or(self.strict))?;
+        let list_like = input.validate_tuple(extra.strict.unwrap_or(self.strict))?;
+        self.validate_list_like(py, list_like, input, extra, slots, recursion_guard)
+    }
+
+    fn get_name(&self) -> &str {
+        &self.name
+    }
+
+    fn complete(&mut self, build_context: &BuildContext) -> PyResult<()> {
+        self.items_validators
+            .iter_mut()
+            .try_for_each(|v| v.complete(build_context))
+    }
+}
+
+impl TuplePositionalValidator {
+    pub fn validate_list_like<'s, 'data>(
+        &'s self,
+        py: Python<'data>,
+        list_like: GenericListLike,
+        input: &'data impl Input<'data>,
+        extra: &Extra,
+        slots: &'data [CombinedValidator],
+        recursion_guard: &'s mut RecursionGuard,
+    ) -> ValResult<'data, PyObject> {
         let expected_length = self.items_validators.len();
 
         if seq.generic_len() < expected_length {
@@ -167,7 +191,7 @@ impl Validator for TuplePositionalValidator {
                 }
             };
         }
-        match seq {
+        match list_like {
             GenericListLike::List(list_like) => iter!(list_like),
             GenericListLike::Tuple(list_like) => iter!(list_like),
             GenericListLike::Set(list_like) => iter!(list_like),
@@ -179,15 +203,5 @@ impl Validator for TuplePositionalValidator {
         } else {
             Err(ValError::LineErrors(errors))
         }
-    }
-
-    fn get_name(&self) -> &str {
-        &self.name
-    }
-
-    fn complete(&mut self, build_context: &BuildContext) -> PyResult<()> {
-        self.items_validators
-            .iter_mut()
-            .try_for_each(|v| v.complete(build_context))
     }
 }
